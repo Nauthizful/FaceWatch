@@ -7,35 +7,6 @@ Rectangle { // Le conteneur principal QML
     width: 390; height: 390
     color: theme.main
 
-    // // ==========================================
-    // // VARIABLES & DEBUG (TIME MACHINE)
-    // // ==========================================
-
-    // // 1. Choisis ta date de départ (Format: AAAA-MM-JJTHH:MM:SS)
-    // property date time: new Date("2028-02-28T11:59:50")
-
-    // // 2. Le multiplicateur de vitesse
-    // // 1 = Temps réel
-    // // 60 = 1 minute passe en 1 seconde
-    // // 3600 = 1 heure passe en 1 seconde
-    // property int timeSpeed: 100000
-
-    // property int fakeSeconds: 0
-    // antialiasing: true
-
-    // // ==========================================
-    // // TIMER (Moteur d'animation)
-    // // ==========================================
-    // Timer {
-    //     interval: 16 // ~60 FPS
-    //     running: true
-    //     repeat: true
-    //     onTriggered: {
-    //         // Au lieu de prendre l'heure réelle, on ajoute du temps artificiel à notre variable
-    //         // 16ms * timeSpeed
-    //         background.time = new Date(background.time.getTime() + (16 * timeSpeed))
-    //     }
-    // }
     /////////////////////////////////
     //           TIMER             //
     /////////////////////////////////
@@ -87,15 +58,62 @@ Rectangle { // Le conteneur principal QML
         color: theme.bg
         rotation: (time.getMinutes() * 6) + (time.getSeconds() * 0.1) + (time.getMilliseconds() * 0.0001)
 
-        // AIGUILLE DES MINUTES
-        Rectangle {
-            id: aiguilleMinutes
-            width: 5; height: parent.height / 2 - 40;
-            anchors.top: parent.top
-            anchors.topMargin: 45
+        Item { // Aiguille des minutes
+            id: aiguilleHeures
+            width: 16
+            height: parent.height / 2 - 45
+            antialiasing: true
+
+            anchors.bottom: parent.verticalCenter
             anchors.horizontalCenter: parent.horizontalCenter
-            color: theme.main
+            Shape {
+                anchors.fill: parent
+                antialiasing: true
+
+                ShapePath {
+                    id: aiguilleHeuresPath
+                    fillColor: theme.main
+                    strokeColor: "transparent"
+
+                    property real tipW: 4
+
+                    // 0. Point de départ : Haut-GAUCHE de la pointe
+                    startX: (aiguilleHeures.width / 2) - (tipW / 2)
+                    startY: tipW / 2
+
+                    // 1. Le dôme de la pointe (de Gauche à Droite -> bombe vers le HAUT)
+                    PathArc {
+                        x: (aiguilleHeures.width / 2) + (aiguilleHeuresPath.tipW / 2)
+                        y: aiguilleHeuresPath.tipW / 2
+                        radiusX: aiguilleHeuresPath.tipW / 2
+                        radiusY: aiguilleHeuresPath.tipW / 2
+                        // On laisse la direction par défaut (Clockwise)
+                    }
+
+                    // 2. Le flanc DROIT (descend en s'évasant vers la base droite)
+                    PathLine {
+                        x: aiguilleHeures.width
+                        y: aiguilleHeures.height - (aiguilleHeures.width / 2)
+                    }
+
+                    // 3. L'arrondi de la base (de Droite à Gauche -> bombe vers le BAS)
+                    PathArc {
+                        x: 0
+                        y: aiguilleHeures.height - (aiguilleHeures.width / 2)
+                        radiusX: aiguilleHeures.width / 2
+                        radiusY: aiguilleHeures.width / 2
+                        // On laisse la direction par défaut (Clockwise)
+                    }
+
+                    // 4. Le flanc GAUCHE (remonte vers le point de départ pour fermer)
+                    PathLine {
+                        x: aiguilleHeuresPath.startX
+                        y: aiguilleHeuresPath.startY
+                    }
+                }
+            }
         }
+
         /////////////////////////////////
         //          HEURES             //
         /////////////////////////////////
@@ -105,9 +123,20 @@ Rectangle { // Le conteneur principal QML
             color: theme.bg
             radius: height/2
 
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: parent.width * 0.1
+            scale: 1 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+
+            // anchors.horizontalCenter: parent.horizontalCenter
+            // anchors.bottom: parent.bottom
+            // anchors.bottomMargin: parent.width * 0.1
+
+            // --- CONTRÔLE DU PLACEMENT ---
+            property real distanceCentre: 80 // Éloignement du centre (0 = collé au centre)
+            property real anglePlacement: 180  // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
+
+            // Ne touche pas à cette formule, elle place l'élément automatiquement
+            x: (parent.width / 2) - (width / 2) + distanceCentre * Math.sin(anglePlacement * Math.PI / 180)
+            y: (parent.height / 2) - (height / 2) - distanceCentre * Math.cos(anglePlacement * Math.PI / 180)
+
             rotation: -parent.rotation
 
             Text {
@@ -152,14 +181,64 @@ Rectangle { // Le conteneur principal QML
                 anchors.verticalCenter: parent.verticalCenter
                 rotation: (time.getHours() % 12) * 30 + (time.getMinutes() * 0.5)
 
-                //AIGUILLE DES HEURES
-                Rectangle {
+                // ==========================================
+                // AIGUILLE VECTORIELLE "GOUTTE D'EAU"
+                // ==========================================
+                Item {
                     id: aiguilleHeure
-                    width: heures.width * 0.05; height: heures.width * 0.25;
-                    anchors.top: parent.top
-                    anchors.topMargin: heures.width * 0.05
+                    width: 9
+                    height: parent.height / 2 - 5
+
+                    anchors.bottom: parent.verticalCenter
+                    anchors.bottomMargin: -(width / 2)
                     anchors.horizontalCenter: parent.horizontalCenter
-                    color: theme.accent
+
+                    Shape {
+                        anchors.fill: parent
+                        antialiasing: true
+
+                        ShapePath {
+                            id: aiguilleHeurePath
+                            fillColor: theme.main
+                            strokeColor: "transparent"
+
+                            property real tipW: 4
+
+                            // 0. Point de départ : Haut-GAUCHE de la pointe
+                            startX: (aiguilleHeure.width / 2) - (tipW / 2)
+                            startY: tipW / 2
+
+                            // 1. Le dôme de la pointe (de Gauche à Droite -> bombe vers le HAUT)
+                            PathArc {
+                                x: (aiguilleHeure.width / 2) + (aiguilleHeurePath.tipW / 2)
+                                y: aiguilleHeurePath.tipW / 2
+                                radiusX: aiguilleHeurePath.tipW / 2
+                                radiusY: aiguilleHeurePath.tipW / 2
+                                // On laisse la direction par défaut (Clockwise)
+                            }
+
+                            // 2. Le flanc DROIT (descend en s'évasant vers la base droite)
+                            PathLine {
+                                x: aiguilleHeure.width
+                                y: aiguilleHeure.height - (aiguilleHeure.width / 2)
+                            }
+
+                            // 3. L'arrondi de la base (de Droite à Gauche -> bombe vers le BAS)
+                            PathArc {
+                                x: 0
+                                y: aiguilleHeure.height - (aiguilleHeure.width / 2)
+                                radiusX: aiguilleHeure.width / 2
+                                radiusY: aiguilleHeure.width / 2
+                                // On laisse la direction par défaut (Clockwise)
+                            }
+
+                            // 4. Le flanc GAUCHE (remonte vers le point de départ pour fermer)
+                            PathLine {
+                                x: aiguilleHeurePath.startX
+                                y: aiguilleHeurePath.startY
+                            }
+                        }
+                    }
                 }
             }
 
@@ -172,9 +251,16 @@ Rectangle { // Le conteneur principal QML
             width: 50; height: width
             color: theme.bg
             radius: height/2
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            anchors.leftMargin: 40
+
+            scale: 0.8 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+
+            // --- CONTRÔLE DU PLACEMENT ---
+            property real distanceCentre: 120 // Éloignement du centre (0 = collé au centre)
+            property real anglePlacement:  115 // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
+
+            // Ne touche pas à cette formule, elle place l'élément automatiquement
+            x: (parent.width / 2) - (width / 2) + distanceCentre * Math.sin(anglePlacement * Math.PI / 180)
+            y: (parent.height / 2) - (height / 2) - distanceCentre * Math.cos(anglePlacement * Math.PI / 180)
             rotation: -parent.rotation
 
             Item {
@@ -242,10 +328,15 @@ Rectangle { // Le conteneur principal QML
             color: theme.bg
             radius: height/2
 
-            // Placement : à droite (à l'opposé des secondes) et centré verticalement
-            anchors.right: parent.right
-            anchors.rightMargin: 55
-            anchors.verticalCenter: parent.verticalCenter
+            scale: 1 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+
+            // --- CONTRÔLE DU PLACEMENT ---
+            property real distanceCentre: 90 // Éloignement du centre (0 = collé au centre)
+            property real anglePlacement: 290  // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
+
+            // Ne touche pas à cette formule, elle place l'élément automatiquement
+            x: (parent.width / 2) - (width / 2) + distanceCentre * Math.sin(anglePlacement * Math.PI / 180)
+            y: (parent.height / 2) - (height / 2) - distanceCentre * Math.cos(anglePlacement * Math.PI / 180)
 
             rotation: -parent.rotation
             Repeater {
@@ -313,14 +404,68 @@ Rectangle { // Le conteneur principal QML
                     return (jour * degParJour) + ((heure / 24) * degParJour) + ((minute / 1440) * degParJour);
                 }
 
-                Rectangle{
+                // ==========================================
+                // AIGUILLE VECTORIELLE DES JOURS
+                // ==========================================
+                Item {
                     id: aiguilleJours
-                    color: theme.main
+
+                    // 1. LES BONNES PROPORTIONS (Base > Pointe)
+                    width: 8
+                    height: 32
+
+                    // 2. LE PLACEMENT DU PIVOT EXACT AU CENTRE
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 4; height: parent.height/2
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: parent // Toujours là, fidèle au poste
+                    anchors.bottom: parent.verticalCenter
+                    // On abaisse de la moitié de la base pour centrer le cercle
+                    anchors.bottomMargin: -(width / 2)
+
+                    // (Plus de propriété 'rotation' ici !)
+
+                    Shape {
+                        anchors.fill: parent
+                        antialiasing: true
+
+                        ShapePath {
+                            id: aiguilleJoursPath
+                            fillColor: theme.accent // Orange pour les heures
+                            strokeColor: "transparent"
+
+                            property real tipW: 3 // La pointe est bien plus fine que la base (12)
+
+                            // 0. Point de départ : Haut-GAUCHE de la pointe
+                            startX: (aiguilleJours.width / 2) - (tipW / 2)
+                            startY: tipW / 2
+
+                            // 1. Le dôme de la pointe
+                            PathArc {
+                                x: (aiguilleJours.width / 2) + (aiguilleJoursPath.tipW / 2)
+                                y: aiguilleJoursPath.tipW / 2
+                                radiusX: aiguilleJoursPath.tipW / 2
+                                radiusY: aiguilleJoursPath.tipW / 2
+                            }
+
+                            // 2. Le flanc DROIT
+                            PathLine {
+                                x: aiguilleJours.width
+                                y: aiguilleJours.height - (aiguilleJours.width / 2)
+                            }
+
+                            // 3. L'arrondi de la base
+                            PathArc {
+                                x: 0
+                                y: aiguilleJours.height - (aiguilleJours.width / 2)
+                                radiusX: aiguilleJours.width / 2
+                                radiusY: aiguilleJours.width / 2
+                            }
+
+                            // 4. Le flanc GAUCHE
+                            PathLine {
+                                x: aiguilleJoursPath.startX
+                                y: aiguilleJoursPath.startY
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -332,28 +477,34 @@ Rectangle { // Le conteneur principal QML
             width: 50; height: 50
             color: theme.bg
             radius: height / 2
-            
-            anchors.left: parent.left
-            anchors.leftMargin: 100
-            anchors.verticalCenter: parent.verticalCenter
-            
+
+            scale: 1.6 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+
+            // --- CONTRÔLE DU PLACEMENT ---
+            property real distanceCentre: 95 // Éloignement du centre (0 = collé au centre)
+            property real anglePlacement: 70  // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
+
+            // Ne touche pas à cette formule, elle place l'élément automatiquement
+            x: (parent.width / 2) - (width / 2) + distanceCentre * Math.sin(anglePlacement * Math.PI / 180)
+            y: (parent.height / 2) - (height / 2) - distanceCentre * Math.cos(anglePlacement * Math.PI / 180)
+
             rotation: -parent.rotation // Reste droit
 
             // --- 1. LES 3 ARCS FIXES (Vectoriel Pur) ---
             // LE REPEATER EST À L'EXTÉRIEUR !
             Repeater {
-                model: 3 
-                
+                model: 3
+
                 delegate: Shape {
                     anchors.fill: parent
                     antialiasing: true
-                    
+
                     ShapePath {
                         id: arcPath
                         strokeWidth: 3
                         fillColor: "transparent"
                         capStyle: ShapePath.RoundCap
-                        
+
                         // L'arc index 0 (en bas à gauche) est orange, les autres blancs
                         strokeColor: (index === 0) ? theme.accent : theme.main
 
@@ -376,7 +527,7 @@ Rectangle { // Le conteneur principal QML
                             y: (batterieSatellite.height / 2) + arcPath.rad * Math.sin(arcPath.endRad)
                             radiusX: arcPath.rad
                             radiusY: arcPath.rad
-                            useLargeArc: false 
+                            useLargeArc: false
                         }
                     }
                 }
@@ -384,22 +535,78 @@ Rectangle { // Le conteneur principal QML
 
             // --- 2. L'AIGUILLE INDICATRICE ---
             Rectangle {
-                id: aiguilleBatterie
+                id: zoneAiguilleBatterie
                 anchors.centerIn: parent
                 width: parent.width; height: parent.height
                 color: "transparent"
-                
+
                 // Rotation de 210° (0%) à 510° (100%)
                 // Utilise batteryChargePercentage.value pour le vrai pourcentage
                 property int niveauActuel: 50 // <-- MOCK (Remplace par batteryChargePercentage.value)
                 rotation: 210 + ((niveauActuel / 100) * 300)
 
-                Rectangle {
-                    width: 3; height: 14 
-                    color: theme.main 
-                    radius: width / 2
+                // ==========================================
+                // AIGUILLE VECTORIELLE DE LA BATTERIE
+                // ==========================================
+                Item {
+                    id: aiguilleBatterie
+
+                    // 1. LES BONNES PROPORTIONS (Base > Pointe)
+                    width: 4
+                    height: parent.height / 2 - 10
+
+                    // 2. LE PLACEMENT DU PIVOT EXACT AU CENTRE
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: (parent.height / 2) - height // Pointe vers le haut de son conteneur
+                    anchors.bottom: parent.verticalCenter
+                    // On abaisse de la moitié de la base pour centrer le cercle
+                    anchors.bottomMargin: -(width / 2)
+
+                    // (Plus de propriété 'rotation' ici !)
+
+                    Shape {
+                        anchors.fill: parent
+                        antialiasing: true
+
+                        ShapePath {
+                            id: aiguilleBatteriePath
+                            fillColor: theme.accent // Orange pour les heures
+                            strokeColor: "transparent"
+
+                            property real tipW: 2 // La pointe est bien plus fine que la base (12)
+
+                            // 0. Point de départ : Haut-GAUCHE de la pointe
+                            startX: (aiguilleBatterie.width / 2) - (tipW / 2)
+                            startY: tipW / 2
+
+                            // 1. Le dôme de la pointe
+                            PathArc {
+                                x: (aiguilleBatterie.width / 2) + (aiguilleBatteriePath.tipW / 2)
+                                y: aiguilleBatteriePath.tipW / 2
+                                radiusX: aiguilleBatteriePath.tipW / 2
+                                radiusY: aiguilleBatteriePath.tipW / 2
+                            }
+
+                            // 2. Le flanc DROIT
+                            PathLine {
+                                x: aiguilleBatterie.width
+                                y: aiguilleBatterie.height - (aiguilleBatterie.width / 2)
+                            }
+
+                            // 3. L'arrondi de la base
+                            PathArc {
+                                x: 0
+                                y: aiguilleBatterie.height - (aiguilleBatterie.width / 2)
+                                radiusX: aiguilleBatterie.width / 2
+                                radiusY: aiguilleBatterie.width / 2
+                            }
+
+                            // 4. Le flanc GAUCHE
+                            PathLine {
+                                x: aiguilleBatteriePath.startX
+                                y: aiguilleBatteriePath.startY
+                            }
+                        }
+                    }
                 }
             }
 
@@ -433,7 +640,6 @@ Rectangle { // Le conteneur principal QML
                 }
             }
         }
-        
     }
 
     /////////////////////////////////
@@ -531,33 +737,4 @@ Rectangle { // Le conteneur principal QML
             }
         }
     }
-
-    /////////////////////////////////
-    //  HEURE NUMERIQUE - DEBOGAGE //
-    /////////////////////////////////
-    // Text {
-    //     id: debugTime
-    //     // On formate l'heure pour qu'elle soit lisible : HH:MM:SS
-    //     text: Qt.formatDateTime(background.time, "hh:mm:ss")
-
-    //     color: "cyan" // Une couleur qui tranche avec le reste
-    //     font.pixelSize: 24
-    //     font.family: "Monospace" // Plus facile à lire pour des chiffres qui bougent
-    //     font.bold: true
-
-    //     // On le place en bas au centre
-    //     anchors.bottom: parent.bottom
-    //     anchors.horizontalCenter: parent.horizontalCenter
-    //     anchors.bottomMargin: 20
-
-    //     // On ajoute un petit fond noir semi-transparent pour la lisibilité
-    //     Rectangle {
-    //         anchors.fill: parent
-    //         anchors.margins: -5
-    //         color: "black"
-    //         opacity: 0.7
-    //         z: -1 // Derrière le texte
-    //         radius: 5
-    //     }
-    // }
 }
