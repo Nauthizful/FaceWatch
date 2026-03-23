@@ -428,7 +428,7 @@ Rectangle { // Le conteneur principal QML
 
                         ShapePath {
                             id: aiguilleJoursPath
-                            fillColor: theme.accent // Orange pour les heures
+                            fillColor: theme.main // Orange pour les heures
                             strokeColor: "transparent"
 
                             property real tipW: 3 // La pointe est bien plus fine que la base (12)
@@ -569,7 +569,7 @@ Rectangle { // Le conteneur principal QML
 
                         ShapePath {
                             id: aiguilleBatteriePath
-                            fillColor: theme.accent // Orange pour les heures
+                            fillColor: theme.main // Orange pour les heures
                             strokeColor: "transparent"
 
                             property real tipW: 2 // La pointe est bien plus fine que la base (12)
