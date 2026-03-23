@@ -1,16 +1,46 @@
 import QtQuick 2.0
 import QtQuick.Shapes 1.0
 
-Rectangle {
-    
+Rectangle { // Le conteneur principal QML
+
     id: background
     width: 390; height: 390
     color: theme.main
+
+    // // ==========================================
+    // // VARIABLES & DEBUG (TIME MACHINE)
+    // // ==========================================
+
+    // // 1. Choisis ta date de départ (Format: AAAA-MM-JJTHH:MM:SS)
+    // property date time: new Date("2028-02-28T11:59:50")
+
+    // // 2. Le multiplicateur de vitesse
+    // // 1 = Temps réel
+    // // 60 = 1 minute passe en 1 seconde
+    // // 3600 = 1 heure passe en 1 seconde
+    // property int timeSpeed: 100000
+
+    // property int fakeSeconds: 0
+    // antialiasing: true
+
+    // // ==========================================
+    // // TIMER (Moteur d'animation)
+    // // ==========================================
+    // Timer {
+    //     interval: 16 // ~60 FPS
+    //     running: true
+    //     repeat: true
+    //     onTriggered: {
+    //         // Au lieu de prendre l'heure réelle, on ajoute du temps artificiel à notre variable
+    //         // 16ms * timeSpeed
+    //         background.time = new Date(background.time.getTime() + (16 * timeSpeed))
+    //     }
+    // }
     /////////////////////////////////
     //           TIMER             //
     /////////////////////////////////
     Timer {
-        interval: 16 
+        interval: 16
         running: true
         repeat: true
         onTriggered: {
@@ -22,7 +52,6 @@ Rectangle {
     /////////////////////////////////
     property int angle: 0;
     property date time: new Date()
-    property int fakeSeconds: 0
     antialiasing: true
 
     /////////////////////////////////
@@ -48,10 +77,10 @@ Rectangle {
         property int fontSizeLarge: 24
     }
 
-   /////////////////////////////////
-   //          CADRAN             //
-   /////////////////////////////////
-    Rectangle {
+    /////////////////////////////////
+    //          CADRAN             //
+    /////////////////////////////////
+    Rectangle { // Le cadran qui tourne pour les minutes
         id: cadran
         width: background.width; height: background.height
         radius: height/2
@@ -61,16 +90,16 @@ Rectangle {
         // AIGUILLE DES MINUTES
         Rectangle {
             id: aiguilleMinutes
-            width: 5; height: parent.height / 2 - 20;
+            width: 5; height: parent.height / 2 - 40;
             anchors.top: parent.top
-            anchors.topMargin: 25
+            anchors.topMargin: 45
             anchors.horizontalCenter: parent.horizontalCenter
             color: theme.main
         }
         /////////////////////////////////
         //          HEURES             //
         /////////////////////////////////
-        Rectangle {
+        Rectangle { // Disque des heures
             id: heures
             width: 150; height: width
             color: theme.bg
@@ -138,9 +167,9 @@ Rectangle {
         /////////////////////////////////
         //         SECONDES            //
         /////////////////////////////////
-        Rectangle {
+        Rectangle { // Disque des secondes
             id: secondes
-            width: 50; height: 50
+            width: 50; height: width
             color: theme.bg
             radius: height/2
             anchors.verticalCenter: parent.verticalCenter
@@ -150,40 +179,66 @@ Rectangle {
 
             Item {
                 id: conteneurArc
-                width: parent.width - 10; height: parent.height - 10 // Taille du cercle parent
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.horizontalCenter: parent.horizontalCenter
-                // (Secondes * 6) + (Millisecondes * 0.006)
+                width: parent.width - 10; height: parent.height - 10
+                anchors.centerIn: parent
+                // La rotation fluide des secondes est conservée ici
                 rotation: (time.getSeconds() * 6) + (time.getMilliseconds() * 0.006)
-                // 1. Le Cercle qui donne la courbure
-                Rectangle {
-                    id: cercleCourbe
-                    anchors.fill: parent
-                    radius: height / 2
-                    color: "transparent"
-                    // L'épaisseur de ton arc
-                    border.width: 5
-                    border.color: theme.accent
-                    // Pour lisser la courbe
-                    antialiasing: true
-                }
 
-                // 2. Le Masque (un rectangle noir qui cache le bas)
-                Rectangle {
-                    width: parent.width
-                    height: parent.height / 2
-                    color: theme.bg // La couleur du fond de ta montre
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 10
+                // --- LES 2 ARCS VECTORIELS ---
+                Repeater {
+                    model: 2 // 2 arcs opposés
+
+                    delegate: Shape {
+                        anchors.fill: parent
+                        antialiasing: true
+
+                        ShapePath {
+                            id: secArcPath
+                            strokeWidth: 5 // Ton ancienne épaisseur
+                            strokeColor: theme.accent
+                            fillColor: "transparent"
+                            capStyle: ShapePath.RoundCap // Bouts ronds
+
+                            // --- CALCULS GÉOMÉTRIQUES ---
+                            // Rayon adapté à la taille du conteneur (40x40)
+                            readonly property real rayonOrbite: 16
+
+                            // Un segment prend la moitié du cercle (PI radians = 180°)
+                            readonly property real angleTotalSegment: Math.PI
+
+                            // On définit la taille de l'arc visuel (ex: 60% du demi-cercle)
+                            // Plus ce chiffre est proche de 1, plus le trou sera petit
+                            readonly property real angleSweepArc: angleTotalSegment * 0.75
+
+                            // Décalage pour centrer l'arc dans son segment
+                            readonly property real angleDepartBase: (index * angleTotalSegment) - (Math.PI / 2)
+                            readonly property real angleDepartAjuste: angleDepartBase + ((angleTotalSegment - angleSweepArc) / 2)
+
+                            // Point de départ
+                            startX: (conteneurArc.width / 2) + rayonOrbite * Math.cos(angleDepartAjuste)
+                            startY: (conteneurArc.height / 2) + rayonOrbite * Math.sin(angleDepartAjuste)
+
+                            // Tracé de la courbe
+                            PathArc {
+                                radiusX: secArcPath.rayonOrbite
+                                radiusY: secArcPath.rayonOrbite
+
+                                x: (conteneurArc.width / 2) + secArcPath.rayonOrbite * Math.cos(secArcPath.angleDepartAjuste + secArcPath.angleSweepArc)
+                                y: (conteneurArc.height / 2) + secArcPath.rayonOrbite * Math.sin(secArcPath.angleDepartAjuste + secArcPath.angleSweepArc)
+
+                                useLargeArc: false
+                            }
+                        }
+                    }
                 }
             }
         }
         /////////////////////////////////
         //            JOURS            //
         /////////////////////////////////
-        Rectangle {
+        Rectangle { // Disque des jours
             id: jourSemaine
-            width: 50; height: 50
+            width: 50; height: width
             color: theme.bg
             radius: height/2
 
@@ -236,24 +291,24 @@ Rectangle {
                 }
             }
 
-            Rectangle{
+            Rectangle{ // Aiguille des jours
                 id: zoneAiguille
                 color: theme.bg
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - 2; height: width;
                 radius: width/2
-                
+
                 // --- ROTATION CONTINUE (Lundi = 0 en haut) ---
                 rotation: {
-                    let degParJour = 360 / 7; 
-                    
+                    let degParJour = 360 / 7;
+
                     // L'astuce magique pour recadrer la semaine sur le Lundi
-                    let jour = (time.getDay() + 6) % 7; 
-                    
+                    let jour = (time.getDay() + 6) % 7;
+
                     let heure = time.getHours();
                     let minute = time.getMinutes();
-                    
+
                     // L'aiguille avance doucement tout au long de la journée
                     return (jour * degParJour) + ((heure / 24) * degParJour) + ((minute / 1440) * degParJour);
                 }
@@ -266,60 +321,243 @@ Rectangle {
                     width: 4; height: parent.height/2
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: parent // Toujours là, fidèle au poste
-                }    
+                }
             }
         }
         /////////////////////////////////
-        //      TRAITS DES MINUTES     //
+        //          BATTERIE           //
         /////////////////////////////////
-        Repeater {
-            model: 60
-            delegate: Rectangle {
-                id: minuteMark
+        Rectangle { // Cadran batterile
+            id: batterieSatellite
+            width: 50; height: 50
+            color: theme.bg
+            radius: height / 2
+            
+            anchors.left: parent.left
+            anchors.leftMargin: 100
+            anchors.verticalCenter: parent.verticalCenter
+            
+            rotation: -parent.rotation // Reste droit
 
-                // Style : un peu plus large et long toutes les 5 minutes
+            // --- 1. LES 3 ARCS FIXES (Vectoriel Pur) ---
+            // LE REPEATER EST À L'EXTÉRIEUR !
+            Repeater {
+                model: 3 
+                
+                delegate: Shape {
+                    anchors.fill: parent
+                    antialiasing: true
+                    
+                    ShapePath {
+                        id: arcPath
+                        strokeWidth: 3
+                        fillColor: "transparent"
+                        capStyle: ShapePath.RoundCap
+                        
+                        // L'arc index 0 (en bas à gauche) est orange, les autres blancs
+                        strokeColor: (index === 0) ? theme.accent : theme.main
+
+                        // --- MATHÉMATIQUES DES ARCS ---
+                        readonly property real rad: 20
+                        readonly property real startAngle: 220 + (index * 100)
+                        readonly property real endAngle: startAngle + 85
+
+                        // Conversion en radians (-90 pour que 0° soit bien à Midi)
+                        readonly property real startRad: (startAngle - 90) * (Math.PI / 180)
+                        readonly property real endRad: (endAngle - 90) * (Math.PI / 180)
+
+                        // 1. Point de départ
+                        startX: (batterieSatellite.width / 2) + rad * Math.cos(startRad)
+                        startY: (batterieSatellite.height / 2) + rad * Math.sin(startRad)
+
+                        // 2. Tracé jusqu'au point d'arrivée
+                        PathArc {
+                            x: (batterieSatellite.width / 2) + arcPath.rad * Math.cos(arcPath.endRad)
+                            y: (batterieSatellite.height / 2) + arcPath.rad * Math.sin(arcPath.endRad)
+                            radiusX: arcPath.rad
+                            radiusY: arcPath.rad
+                            useLargeArc: false 
+                        }
+                    }
+                }
+            }
+
+            // --- 2. L'AIGUILLE INDICATRICE ---
+            Rectangle {
+                id: aiguilleBatterie
+                anchors.centerIn: parent
+                width: parent.width; height: parent.height
+                color: "transparent"
+                
+                // Rotation de 210° (0%) à 510° (100%)
+                // Utilise batteryChargePercentage.value pour le vrai pourcentage
+                property int niveauActuel: 50 // <-- MOCK (Remplace par batteryChargePercentage.value)
+                rotation: 210 + ((niveauActuel / 100) * 300)
+
+                Rectangle {
+                    width: 3; height: 14 
+                    color: theme.main 
+                    radius: width / 2
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: (parent.height / 2) - height // Pointe vers le haut de son conteneur
+                }
+            }
+
+            // --- 3. LOGO BATTERIE VECTORIEL FIXE (À 6H) ---
+            Item {
+                width: 7; height: 11
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 2
+
+                // Gestion de la couleur (orange si < 33%, sinon gris)
+                property color iconColor: (aiguilleBatterie.niveauActuel <= 33) ? theme.accent : theme.main
+
+                // Le corps de la pile (contour)
+                Rectangle {
+                    width: 7; height: 10
+                    anchors.bottom: parent.bottom
+                    color: "transparent"
+                    border.width: 1
+                    border.color: parent.iconColor
+                    radius: 1.5
+                }
+
+                // Le plot positif en haut
+                Rectangle {
+                    width: 3; height: 1.5
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    color: parent.iconColor
+                    radius: 0.5
+                }
+            }
+        }
+        
+    }
+
+    /////////////////////////////////
+    //      TRAITS DES MINUTES     //
+    /////////////////////////////////
+    Repeater {
+        model: 60
+
+        // Le delegate devient un conteneur global "Item"
+        delegate: Item {
+            id: minuteMarkWrapper
+
+            // On lui donne une petite taille pour que la rotation s'axe bien au centre
+            width: 15; height: 15
+
+            // --- PLACEMENT ET ROTATION (Identique à ton code) ---
+            property real rad: 165
+            property real angle: (index * (Math.PI * 2 / 60)) - (Math.PI / 2)
+
+            x: (parent.width / 2) + rad * Math.cos(angle) - (width / 2)
+            y: (parent.height / 2) + rad * Math.sin(angle) - (height / 2)
+
+            rotation: index * 6
+
+            // --- 1. LE TRAIT CLASSIQUE ---
+            Rectangle {
+                anchors.centerIn: parent
                 width: (index % 5 === 0) ? 3 : 1
                 height: (index % 5 === 0) ? 15 : 8
                 color: theme.main
 
-                // On les place sur le bord
-                property real rad: 185
-                property real angle: (index * (Math.PI * 2 / 60)) - (Math.PI / 2)
+                // LA MAGIE EST ICI : Invisible si on est à 6h (index 30)
+                visible: index !== 30
+            }
 
-                x: (parent.width / 2) + rad * Math.cos(angle) - (width / 2)
-                y: (parent.height / 2) + rad * Math.sin(angle) - (height / 2)
+            // --- 2. LE TRIANGLE DE LA DATE ---
+            Shape {
+                anchors.centerIn: parent
+                width: 12; height: 10 // Largeur et hauteur du triangle
+                antialiasing: true
 
-                // On fait pivoter le trait pour qu'il pointe vers le centre
-                rotation: index * 6
+                // LA MAGIE EST ICI : Visible UNIQUEMENT à 6h
+                visible: index === 30
+
+                ShapePath {
+                    fillColor: theme.accent // Orange pour guider l'œil vers la date
+                    strokeColor: "transparent"
+
+                    // Dessin vectoriel du triangle
+                    // Il pointe vers le "haut" de sa propre boîte.
+                    // Comme l'index 30 est tourné à 180°, il pointera vers le bas, droit sur la date !
+                    startX: 0; startY: 10      // Coin en bas à gauche
+                    PathLine { x: 12; y: 10 }  // Ligne vers le coin en bas à droite
+                    PathLine { x: 6; y: 0 }    // Ligne vers la pointe en haut au centre
+                    PathLine { x: 0; y: 10 }   // Retour au point de départ pour fermer
+                }
             }
         }
-        /////////////////////////////////
-        //  HEURE NUMERIQUE - DEBOGAGE //
-        /////////////////////////////////
-        // Text {
-        //     id: debugTime
-        //     // On formate l'heure pour qu'elle soit lisible : HH:MM:SS
-        //     text: Qt.formatDateTime(background.time, "hh:mm:ss")
-
-        //     color: "cyan" // Une couleur qui tranche avec le reste
-        //     font.pixelSize: 24
-        //     font.family: "Monospace" // Plus facile à lire pour des chiffres qui bougent
-        //     font.bold: true
-
-        //     // On le place en bas au centre
-        //     anchors.bottom: parent.bottom
-        //     anchors.horizontalCenter: parent.horizontalCenter
-        //     anchors.bottomMargin: 20
-
-        //     // On ajoute un petit fond noir semi-transparent pour la lisibilité
-        //     Rectangle {
-        //         anchors.fill: parent
-        //         anchors.margins: -5
-        //         color: "black"
-        //         opacity: 0.7
-        //         z: -1 // Derrière le texte
-        //         radius: 5
-        //     }
-        // }
     }
+    /////////////////////////////////
+    //             DATE            //
+    /////////////////////////////////
+    Item {
+        id: anneauDate
+        anchors.fill: parent // Prend toute la taille de la montre
+
+        // --- LA ROTATION INTELLIGENTE ---
+        // On tourne l'anneau entier pour que la date actuelle tombe à 6h.
+        // Formule : -(Jour actuel - 1) * (360° / 31)
+        // On retire 0.5 jour au total pour que le chiffre soit aligné à midi pile
+        rotation: -((time.getDate() - 1) + (time.getHours() / 24) + (time.getMinutes() / 1440) - 0.5) * (360 / 31)
+
+        // Génération des 31 chiffres
+        Repeater {
+            model: 31
+
+            delegate: Item {
+                anchors.fill: parent
+                // On répartit les 31 Item en cercle.
+                // L'index 0 (le chiffre 1) est placé sans rotation (donc en bas grâce à l'ancre)
+                rotation: index * (360 / 31)
+
+                Text {
+                    text: index + 1
+                    // Le jour actuel s'allume en orange, les autres restent discrets
+                    color: (index + 1 === time.getDate()) ? theme.accent : theme.main
+                    font.pixelSize: 14
+                    font.bold: (index + 1 === time.getDate())
+
+                    // On place le chiffre tout en bas
+                    anchors.bottom: parent.bottom
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottomMargin: 2 // Petit espace avec le bord de l'écran
+                }
+            }
+        }
+    }
+
+    /////////////////////////////////
+    //  HEURE NUMERIQUE - DEBOGAGE //
+    /////////////////////////////////
+    // Text {
+    //     id: debugTime
+    //     // On formate l'heure pour qu'elle soit lisible : HH:MM:SS
+    //     text: Qt.formatDateTime(background.time, "hh:mm:ss")
+
+    //     color: "cyan" // Une couleur qui tranche avec le reste
+    //     font.pixelSize: 24
+    //     font.family: "Monospace" // Plus facile à lire pour des chiffres qui bougent
+    //     font.bold: true
+
+    //     // On le place en bas au centre
+    //     anchors.bottom: parent.bottom
+    //     anchors.horizontalCenter: parent.horizontalCenter
+    //     anchors.bottomMargin: 20
+
+    //     // On ajoute un petit fond noir semi-transparent pour la lisibilité
+    //     Rectangle {
+    //         anchors.fill: parent
+    //         anchors.margins: -5
+    //         color: "black"
+    //         opacity: 0.7
+    //         z: -1 // Derrière le texte
+    //         radius: 5
+    //     }
+    // }
 }
