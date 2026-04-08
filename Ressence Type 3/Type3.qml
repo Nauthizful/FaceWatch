@@ -1,5 +1,6 @@
 import QtQuick 2.0
 import QtQuick.Shapes 1.0
+import Nemo.Mce 1.0
 
 Rectangle { // Le conteneur principal QML
 
@@ -24,6 +25,13 @@ Rectangle { // Le conteneur principal QML
     property int angle: 0;
     property date time: new Date()
     antialiasing: true
+
+    /////////////////////////////////
+    //         CAPTEURS            //
+    /////////////////////////////////
+    MceBatteryLevel {
+        id: infoBatterie
+    }
 
     /////////////////////////////////
     //           THÈME             //
@@ -179,7 +187,7 @@ Rectangle { // Le conteneur principal QML
                 color: theme.bg
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
-                rotation: (time.getHours() % 12) * 30 + (time.getMinutes() * 0.5)
+                rotation: (time.getHours() % 12) * 30 + (time.getMinutes() * 0.5) - 15
 
                 // ==========================================
                 // AIGUILLE VECTORIELLE "GOUTTE D'EAU"
@@ -542,7 +550,7 @@ Rectangle { // Le conteneur principal QML
 
                 // Rotation de 210° (0%) à 510° (100%)
                 // Utilise batteryChargePercentage.value pour le vrai pourcentage
-                property int niveauActuel: 50 // <-- MOCK (Remplace par batteryChargePercentage.value)
+                property int niveauActuel: infoBatterie.percent
                 rotation: 210 + ((niveauActuel / 100) * 300)
 
                 // ==========================================
