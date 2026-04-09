@@ -1,24 +1,38 @@
 import QtQuick 2.0
 import QtQuick.Shapes 1.0
 import Nemo.Mce 1.0
+import org.asteroid.utils 1.0
 
 Rectangle { // Le conteneur principal QML
 
     id: background
     width: 390; height: 390
-    color: theme.main
+    color: theme.bg
 
     /////////////////////////////////
-    //           TIMER             //
+    //      MOTEURS TEMPORELS      //
     /////////////////////////////////
+    
+    // 1. MOTEUR ACTIF (60 FPS)
+    // Ce timer ne tourne QUE quand displayAmbient est faux (écran allumé)
     Timer {
-        interval: 16
-        running: true
+        id: activeTimer
+        interval: 16 
+        running: !displayAmbient 
         repeat: true
-        onTriggered: {
-            background.time = new Date()
-        }
+        onTriggered: background.time = new Date()
     }
+
+    // 2. MOTEUR ÉCO (1 MINUTE)
+    // Ce timer prend le relais quand l'écran est éteint
+    Timer {
+        id: ambientTimer
+        interval: 60000 
+        running: displayAmbient 
+        repeat: true
+        onTriggered: background.time = new Date()
+    }
+
     /////////////////////////////////
     //         VARIABLES           //
     /////////////////////////////////
@@ -31,6 +45,14 @@ Rectangle { // Le conteneur principal QML
     /////////////////////////////////
     MceBatteryLevel {
         id: infoBatterie
+    }
+
+    BluetoothStatus {
+        id: btStatus
+    }
+
+    MceBatteryState {
+        id: etatCharge
     }
 
     /////////////////////////////////
@@ -49,6 +71,9 @@ Rectangle { // Le conteneur principal QML
 
         // Gris de soutien pour les éléments secondaires
         property color muted: "#333333"
+
+        // LE vert qui indique que notre batterie charge
+        property color charging: '#69be69' // Un beau vert électrique
 
         // Tailles de police centralisées
         property int fontSizeSmall: 12
@@ -127,18 +152,18 @@ Rectangle { // Le conteneur principal QML
         /////////////////////////////////
         Rectangle { // Disque des heures
             id: heures
-            width: 150; height: width
+            width: 160; height: width
             color: theme.bg
             radius: height/2
 
-            scale: 1 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+            scale: 0.9 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
 
             // anchors.horizontalCenter: parent.horizontalCenter
             // anchors.bottom: parent.bottom
             // anchors.bottomMargin: parent.width * 0.1
 
             // --- CONTRÔLE DU PLACEMENT ---
-            property real distanceCentre: 80 // Éloignement du centre (0 = collé au centre)
+            property real distanceCentre: 100 // Éloignement du centre (0 = collé au centre)
             property real anglePlacement: 180  // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
 
             // Ne touche pas à cette formule, elle place l'élément automatiquement
@@ -260,10 +285,10 @@ Rectangle { // Le conteneur principal QML
             color: theme.bg
             radius: height/2
 
-            scale: 0.8 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+            scale: 1.2 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
 
             // --- CONTRÔLE DU PLACEMENT ---
-            property real distanceCentre: 120 // Éloignement du centre (0 = collé au centre)
+            property real distanceCentre: 140 // Éloignement du centre (0 = collé au centre)
             property real anglePlacement:  115 // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
 
             // Ne touche pas à cette formule, elle place l'élément automatiquement
@@ -332,14 +357,14 @@ Rectangle { // Le conteneur principal QML
         /////////////////////////////////
         Rectangle { // Disque des jours
             id: jourSemaine
-            width: 50; height: width
+            width: 70; height: width
             color: theme.bg
             radius: height/2
 
-            scale: 1 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+            scale: 1.2 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
 
             // --- CONTRÔLE DU PLACEMENT ---
-            property real distanceCentre: 90 // Éloignement du centre (0 = collé au centre)
+            property real distanceCentre: 110 // Éloignement du centre (0 = collé au centre)
             property real anglePlacement: 290  // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
 
             // Ne touche pas à cette formule, elle place l'élément automatiquement
@@ -347,6 +372,7 @@ Rectangle { // Le conteneur principal QML
             y: (parent.height / 2) - (height / 2) - distanceCentre * Math.cos(anglePlacement * Math.PI / 180)
 
             rotation: -parent.rotation
+
             Repeater {
                 model: 7 // Les 7 jours de la semaine
 
@@ -480,16 +506,16 @@ Rectangle { // Le conteneur principal QML
         /////////////////////////////////
         //          BATTERIE           //
         /////////////////////////////////
-        Rectangle { // Cadran batterile
+        Rectangle { // Cadran batterie
             id: batterieSatellite
-            width: 50; height: 50
+            width: 60; height: width
             color: theme.bg
             radius: height / 2
 
-            scale: 1.6 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
+            scale: 1.8 // 1.0 = taille normale, 0.8 = 20% plus petit, 1.5 = 50% plus gros
 
             // --- CONTRÔLE DU PLACEMENT ---
-            property real distanceCentre: 95 // Éloignement du centre (0 = collé au centre)
+            property real distanceCentre: 110 // Éloignement du centre (0 = collé au centre)
             property real anglePlacement: 70  // Angle (0 = 12h, 90 = 3h, 180 = 6h, 270 = 9h)
 
             // Ne touche pas à cette formule, elle place l'élément automatiquement
@@ -625,8 +651,10 @@ Rectangle { // Le conteneur principal QML
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 2
 
-                // Gestion de la couleur (orange si < 33%, sinon gris)
-                property color iconColor: (aiguilleBatterie.niveauActuel <= 33) ? theme.accent : theme.main
+                // Gestion de la couleur (vert si en charge, orange si < 33%, sinon gris)
+               property color iconColor: (etatCharge.value === MceBatteryState.Charging) 
+                          ? theme.charging 
+                          : (infoBatterie.percent <= 33 ? theme.accent : theme.main)
 
                 // Le corps de la pile (contour)
                 Rectangle {
@@ -664,7 +692,7 @@ Rectangle { // Le conteneur principal QML
             width: 15; height: 15
 
             // --- PLACEMENT ET ROTATION (Identique à ton code) ---
-            property real rad: 165
+            property real rad: 185
             property real angle: (index * (Math.PI * 2 / 60)) - (Math.PI / 2)
 
             x: (parent.width / 2) + rad * Math.cos(angle) - (width / 2)
@@ -693,7 +721,7 @@ Rectangle { // Le conteneur principal QML
                 visible: index === 30
 
                 ShapePath {
-                    fillColor: theme.accent // Orange pour guider l'œil vers la date
+                    fillColor: btStatus.connected ? theme.accent : "#ff0000"
                     strokeColor: "transparent"
 
                     // Dessin vectoriel du triangle
@@ -706,43 +734,5 @@ Rectangle { // Le conteneur principal QML
                 }
             }
         }
-    }
-    /////////////////////////////////
-    //             DATE            //
-    /////////////////////////////////
-    Item {
-        id: anneauDate
-        anchors.fill: parent // Prend toute la taille de la montre
-
-        // --- LA ROTATION INTELLIGENTE ---
-        // On tourne l'anneau entier pour que la date actuelle tombe à 6h.
-        // Formule : -(Jour actuel - 1) * (360° / 31)
-        // On retire 0.5 jour au total pour que le chiffre soit aligné à midi pile
-        rotation: -((time.getDate() - 1) + (time.getHours() / 24) + (time.getMinutes() / 1440) - 0.5) * (360 / 31)
-
-        // Génération des 31 chiffres
-        Repeater {
-            model: 31
-
-            delegate: Item {
-                anchors.fill: parent
-                // On répartit les 31 Item en cercle.
-                // L'index 0 (le chiffre 1) est placé sans rotation (donc en bas grâce à l'ancre)
-                rotation: index * (360 / 31)
-
-                Text {
-                    text: index + 1
-                    // Le jour actuel s'allume en orange, les autres restent discrets
-                    color: (index + 1 === time.getDate()) ? theme.accent : theme.main
-                    font.pixelSize: 14
-                    font.bold: (index + 1 === time.getDate())
-
-                    // On place le chiffre tout en bas
-                    anchors.bottom: parent.bottom
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottomMargin: 2 // Petit espace avec le bord de l'écran
-                }
-            }
-        }
-    }
+    }   
 }
